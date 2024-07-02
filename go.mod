@@ -1,4 +1,4 @@
-module github.com/m1001-byte/dnsbruteforce
+module github.com/M1001-byte/dnsbruteforce
 
 go 1.22.4
 
