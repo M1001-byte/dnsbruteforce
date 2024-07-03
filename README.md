@@ -1,9 +1,8 @@
 
 # DNS BRUTE FORCE
+![dnsbrute](https://i.imgur.com/OFRvL56.png)
 
 This script performs a brute force attack on DNS servers to discover active subdomains associated with a given domain. It uses a list of keywords to generate potential subdomains quickly and efficiently, querying the DNS server to verify their existence.
-
-![dnsbrute](https://i.imgur.com/OFRvL56.png)
 
 
 ## Installation
