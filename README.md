@@ -34,10 +34,6 @@ Options:
 ```bash
 ./dnsbrute --wordlist best-wordlist.txt --threads 100 --dnsserver 1.1.1.1:53 "google.com"
 ```
-Example outpout file:
-
-
-
 
 ## License
 
