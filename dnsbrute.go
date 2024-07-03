@@ -11,6 +11,7 @@ import (
 
 	"github.com/common-nighthawk/go-figure"
 	"github.com/fatih/color"
+	"github.com/go-ping/ping"
 
 	"github.com/alexflint/go-arg"
 	"github.com/miekg/dns"
@@ -89,17 +90,16 @@ func saveFilePrint(content []string, file string) {
 		return
 	}
 	for i, v := range content {
-
 		splitResult := strings.Split(v, ":")
-		domain, ip, statusCode := splitResult[0], splitResult[1], splitResult[2]
+		domain, ip, statusCode, pinger := splitResult[0], splitResult[1], splitResult[2], splitResult[3]
 
 		green := color.New(color.FgGreen).SprintFunc()
 		yellow := color.New(color.FgYellow).SprintFunc()
 
-		str := fmt.Sprintf("%s %s %s\n", domain, ip, statusCode)
+		str := fmt.Sprintf("%s IP'S:[%s] StatusCode: %v Ping: %v\n", domain, ip, statusCode, pinger)
 		f.WriteString(str)
 
-		fmt.Printf("[ %v ] %v %v %v\n", i, green(domain), yellow(ip), cyan(statusCode))
+		fmt.Printf("[ %v ] %v IP'S: [%v] StatusCode: %v Ping: %v\n", i, green(domain), yellow(ip), cyan(statusCode), cyan(pinger))
 
 	}
 	println()
@@ -120,6 +120,19 @@ func getStatusCode(domain string) (int, error) {
 	}
 }
 
+func checkPing(domain string) bool {
+	pinger, err := ping.NewPinger(domain)
+	if err != nil {
+		return false
+	}
+	pinger.Count = 1
+	err = pinger.Run() // Blocks until finished.
+	if err != nil {
+		return false
+	}
+	return true
+}
+
 func printArgs(args []string) {
 	Domain, Wordlist, Threads, DnsServer, maxRetries, outpout := args[0], args[1], args[2], args[3], args[4], args[5]
 	logo := figure.NewColorFigure("dnsbrute", "ogre", "red", true)
@@ -131,7 +144,7 @@ func printArgs(args []string) {
 	fmt.Printf(" Threads: %s\n", yellow(Threads))
 	fmt.Printf(" DnsServer: %s\n", yellow(DnsServer))
 	fmt.Printf(" Maximium Retries: %v\n", yellow(maxRetries))
-	fmt.Printf(" Outpout: %s\n", yellow(outpout))
+	fmt.Printf(" Outpout: %s\n\n", yellow(outpout))
 
 }
 
@@ -190,7 +203,7 @@ func main() {
 			elapseTime := time.Since(startTime)
 			estimatedTime := elapseTime / time.Duration(index+1) * time.Duration(total_lines-index-1)
 
-			fmt.Printf("\r[ * ] Progress:  %v - %v  (%v - %v)  %v: %v %v: %v %v: %v ",
+			fmt.Printf("\r Progress:  %v - %v  (%v - %v)  %v: %v %v: %v %v: %v ",
 				cyan(index), cyan(len(lines)-1),
 				elapseTime.Round(time.Second), estimatedTime.Round(time.Second),
 				green("SUCCESS"), success, yellow("NXDOMAIN"), nxdomain, red("ERROR"), error)
@@ -210,19 +223,27 @@ func main() {
 		}(test_domain, dnsbrute.dnsServer, dnsbrute.max_retries)
 	}
 	wg.Wait()
-
+	fmt.Printf("\n Checking http status code and ping response (icmp).")
 	// get and add status code
 	for index, value := range domain_list {
+		fmt.Sprintf("..")
 		domain_ip := strings.Split(value, ":")
 		statusCode, err := getStatusCode(domain_ip[0])
+		ping := checkPing(domain_ip[0])
+		// HTTP STATUS CODE
 		if err != nil {
-			fmt.Printf("\n[ %v ] %v: %v:80\n", red("ERROR"), err, domain_ip[0])
 			domain_list[index] += fmt.Sprintf(":%v", "ERROR")
 		} else {
-			domain_list[index] += fmt.Sprintf(":%v", statusCode)
+			domain_list[index] += fmt.Sprintf(":%d", statusCode)
+		}
+		// PINGER
+		if ping {
+			domain_list[index] += fmt.Sprintf(":%v", "OK")
+		} else {
+			domain_list[index] += fmt.Sprintf(":%v", "ERROR")
 		}
 	}
 	saveFilePrint(domain_list, outpout)
-	fmt.Printf("\r[ * ] Total:  %v   %v: %v %v: %v %v: %v\n", cyan(total_lines), green("SUCCESS"), success, yellow("NXDOMAIN"), nxdomain, red("ERROR"), error)
+	fmt.Printf("\r Total:  %v   %v: %v %v: %v %v: %v\n", cyan(total_lines), green("SUCCESS"), success, yellow("NXDOMAIN"), nxdomain, red("ERROR"), error)
 
 }
