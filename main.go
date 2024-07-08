@@ -22,6 +22,7 @@ var args struct {
 	Domain     string `arg:"required,positional" help:"Base domain"`
 	Wordlist   string `arg:"required, --wordlist" help:"Wordlist contain wildcards"`
 	DnsServer  string `default:"1.1.1.1:53" help:"DNS server address. Format: ip:port"`
+	Ping       bool   `default:"false" help:"Verifiy web server (80) and ping response (icmp)"`
 	Threads    int    `default:"100" help:"Number of threads to use"`
 	MaxRetries int    `default:"10" help:"Number of max retries"`
 	Outpout    string `default:"{domain}-outpout.txt" help:"Outpout to save result"`
@@ -30,13 +31,14 @@ var args struct {
 type DnsBrute struct {
 	domain      string
 	dnsServer   string
+	Ping        bool
 	wordlist    string
 	threads     int
 	max_retries int
 }
 
 func printArgs(args []string) {
-	Domain, Wordlist, Threads, DnsServer, maxRetries, outpout := args[0], args[1], args[2], args[3], args[4], args[5]
+	Domain, Wordlist, Threads, DnsServer, maxRetries, outpout, Ping := args[0], args[1], args[2], args[3], args[4], args[5], args[6]
 	logo := figure.NewColorFigure("dnsbrute", "ogre", "red", true)
 	logo.Print()
 
@@ -45,6 +47,7 @@ func printArgs(args []string) {
 	fmt.Printf(" Wordlists: %s\n", yellow(Wordlist))
 	fmt.Printf(" Threads: %s\n", yellow(Threads))
 	fmt.Printf(" DnsServer: %s\n", yellow(DnsServer))
+	fmt.Printf(" Ping http and icmp: %s\n", yellow(Ping))
 	fmt.Printf(" Maximium Retries: %v\n", yellow(maxRetries))
 	fmt.Printf(" Outpout: %s\n\n", yellow(outpout))
 
@@ -75,6 +78,7 @@ func main() {
 	dnsbrute.threads = args.Threads
 	dnsbrute.dnsServer = args.DnsServer
 	dnsbrute.max_retries = args.MaxRetries
+	dnsbrute.Ping = args.Ping
 
 	outpout = args.Outpout
 
@@ -82,7 +86,7 @@ func main() {
 		outpout = fmt.Sprintf("%s-outpout.txt", dnsbrute.domain)
 	}
 
-	printArgs([]string{args.Domain, args.Wordlist, fmt.Sprintf("%d", args.Threads), args.DnsServer, fmt.Sprintf("%d", args.MaxRetries), outpout})
+	printArgs([]string{args.Domain, args.Wordlist, fmt.Sprintf("%d", args.Threads), args.DnsServer, fmt.Sprintf("%d", args.MaxRetries), outpout, fmt.Sprintf("%v", dnsbrute.Ping)})
 
 	// semaforo, para controlar las cantidad de goroutines a ejecutarse
 	semaphore := make(chan struct{}, dnsbrute.threads)
@@ -129,25 +133,30 @@ func main() {
 		}(test_domain, dnsbrute.dnsServer, dnsbrute.max_retries)
 	}
 	wg.Wait()
-	fmt.Printf("\n Checking http status code and ping response (icmp).")
-	// get and add status code
-	for index, value := range domain_list {
-		domain_ip := strings.Split(value, ":")
-		statusCode, err := getStatusCode(domain_ip[0])
-		ping := checkPing(domain_ip[0])
-		// HTTP STATUS CODE
-		if err != nil {
-			domain_list[index] += fmt.Sprintf(":%v", "ERROR")
-		} else {
-			domain_list[index] += fmt.Sprintf(":%d", statusCode)
-		}
-		// PINGER
-		if ping {
-			domain_list[index] += fmt.Sprintf(":%v", "OK")
-		} else {
-			domain_list[index] += fmt.Sprintf(":%v", "ERROR")
+	if dnsbrute.Ping {
+		fmt.Printf("\n Checking http status code and ping response (icmp).")
+
+		// get and add status code
+		for index, value := range domain_list {
+			domain_ip := strings.Split(value, ":")
+
+			statusCode, err := getStatusCode(domain_ip[0])
+			ping := checkPing(domain_ip[0])
+			// HTTP STATUS CODE
+			if err != nil {
+				domain_list[index] += fmt.Sprintf(":%v", "ERROR")
+			} else {
+				domain_list[index] += fmt.Sprintf(":%d", statusCode)
+			}
+			// PINGER
+			if ping {
+				domain_list[index] += fmt.Sprintf(":%v", "OK")
+			} else {
+				domain_list[index] += fmt.Sprintf(":%v", "ERROR")
+			}
 		}
 	}
+
 	saveFilePrint(domain_list, outpout)
 	fmt.Printf("\r Total:  %v   %v: %v %v: %v %v: %v\n", cyan(total_lines), green("SUCCESS"), success, yellow("NXDOMAIN"), nxdomain, red("ERROR"), error)
 

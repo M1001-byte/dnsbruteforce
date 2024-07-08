@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/go-ping/ping"
 
 	"github.com/miekg/dns"
 )
@@ -68,8 +68,13 @@ func saveFilePrint(content []string, file string) {
 		return
 	}
 	for i, v := range content {
+		var domain, ip, statusCode, pinger string
 		splitResult := strings.Split(v, ":")
-		domain, ip, statusCode, pinger := splitResult[0], splitResult[1], splitResult[2], splitResult[3]
+		domain, ip = splitResult[0], splitResult[1]
+
+		if len(splitResult) > 2 {
+			statusCode, pinger = splitResult[2], splitResult[3]
+		}
 
 		green := color.New(color.FgGreen).SprintFunc()
 		yellow := color.New(color.FgYellow).SprintFunc()
@@ -99,12 +104,8 @@ func getStatusCode(domain string) (int, error) {
 }
 
 func checkPing(domain string) bool {
-	pinger, err := ping.NewPinger(domain)
-	if err != nil {
-		return false
-	}
-	pinger.Count = 1
-	err = pinger.Run() // Blocks until finished.
+	cmd := exec.Command("ping", "-c 1", "-W 2", domain)
+	_, err := cmd.Output()
 	if err != nil {
 		return false
 	}
